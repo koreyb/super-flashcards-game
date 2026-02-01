@@ -170,43 +170,90 @@
             transition: all 0.5s ease;
         }
 
-        .voice-controls {
+        .voice-toggle {
             display: flex;
             justify-content: center;
+            align-items: center;
             gap: 10px;
             margin: 15px 0;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
         }
 
-        .voice-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 25px;
-            font-size: 1em;
-            font-weight: bold;
+        .voice-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .voice-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .voice-slider {
+            position: absolute;
             cursor: pointer;
-            transition: all 0.3s;
-            background: linear-gradient(135deg, #fd79a8, #fdcb6e);
-            color: white;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
         }
 
-        .voice-btn:hover { transform: scale(1.05); }
-        .voice-btn.listening { 
-            background: linear-gradient(135deg, #e17055, #fd79a8);
-            animation: pulse 1s infinite;
+        .voice-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .voice-slider {
+            background: linear-gradient(135deg, #fd79a8, #fdcb6e);
+        }
+
+        input:checked + .voice-slider:before {
+            transform: translateX(26px);
         }
 
         .voice-status {
-            background: #f8f9fa;
-            padding: 8px 15px;
-            border-radius: 8px;
+            background: #f0f8ff;
+            padding: 10px 15px;
+            border-radius: 10px;
             margin: 10px 0;
             font-weight: bold;
-            font-size: 0.9em;
+            font-size: 1em;
+            border: 2px solid #e3f2fd;
+            text-align: center;
         }
 
-        .voice-status.listening { background: #ffe8e8; color: #e17055; }
-        .voice-status.heard { background: #e8f5e8; color: #00b894; }
+        .voice-status.listening { 
+            background: linear-gradient(135deg, #ffe8e8, #fff0f0); 
+            color: #e17055; 
+            border-color: #fd79a8;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .voice-status.heard { 
+            background: linear-gradient(135deg, #e8f5e8, #f0fff0); 
+            color: #00b894; 
+            border-color: #00cec9;
+        }
+
+        .microphone-icon {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
 
         .answers {
             display: grid;
@@ -401,8 +448,14 @@
             <div class="level-indicator" id="levelIndicator">Level 1</div>
             <div class="card-display" id="cardDisplay">Welcome! Choose your age to start!</div>
             
-            <div class="voice-controls">
-                <button class="voice-btn" id="voiceBtn" onclick="startVoiceInput()">🎤 Say Answer</button>
+            <div class="voice-toggle">
+                <span class="microphone-icon">🎤</span>
+                <span><strong>Always Listen:</strong></span>
+                <label class="voice-switch">
+                    <input type="checkbox" id="voiceToggle" onchange="toggleVoiceMode()">
+                    <span class="voice-slider"></span>
+                </label>
+                <span id="voiceToggleLabel">OFF</span>
             </div>
             <div class="voice-status" id="voiceStatus" style="display: none;">Ready to listen...</div>
             
@@ -449,6 +502,9 @@
                 // Speech recognition
                 this.recognition = null;
                 this.isListening = false;
+                this.voiceModeEnabled = false;
+                this.voiceRetryCount = 0;
+                this.maxVoiceRetries = 2;
                 
                 this.initializeContent();
                 this.initializeSounds();
@@ -569,6 +625,7 @@
                     this.recognition.continuous = false;
                     this.recognition.interimResults = false;
                     this.recognition.lang = 'en-US';
+                    this.recognition.maxAlternatives = 3;
                     
                     this.recognition.onstart = () => {
                         this.isListening = true;
@@ -583,16 +640,33 @@
                     this.recognition.onend = () => {
                         this.isListening = false;
                         this.updateVoiceUI();
+                        
+                        // Auto-restart if voice mode is enabled and we have a question
+                        if (this.voiceModeEnabled && this.currentQuestion && !this.questionAnswered) {
+                            if (this.voiceRetryCount < this.maxVoiceRetries) {
+                                setTimeout(() => {
+                                    this.startAutoListening();
+                                }, 1000);
+                            }
+                        }
                     };
                     
                     this.recognition.onerror = (event) => {
                         console.log('Speech recognition error:', event.error);
                         this.isListening = false;
                         this.updateVoiceUI();
+                        
+                        // Don't retry on permission errors
+                        if (event.error === 'not-allowed') {
+                            this.voiceModeEnabled = false;
+                            document.getElementById('voiceToggle').checked = false;
+                            this.updateVoiceToggleUI();
+                            alert('Microphone permission denied. Voice mode disabled.');
+                        }
                     };
                 } else {
-                    // Hide voice button if not supported
-                    document.querySelector('.voice-controls').style.display = 'none';
+                    // Hide voice toggle if not supported
+                    document.querySelector('.voice-toggle').style.display = 'none';
                 }
             }
 
@@ -705,14 +779,41 @@
                 }
             }
 
-            startVoiceInput() {
-                if (!this.recognition) {
-                    alert('Voice input not supported in your browser');
-                    return;
-                }
+            toggleVoiceMode() {
+                this.voiceModeEnabled = document.getElementById('voiceToggle').checked;
+                this.updateVoiceToggleUI();
                 
-                if (!this.currentQuestion) {
-                    alert('No question available');
+                if (this.voiceModeEnabled) {
+                    // Start listening for current question if available
+                    if (this.currentQuestion && !this.questionAnswered) {
+                        this.startAutoListening();
+                    }
+                } else {
+                    // Stop listening if currently active
+                    if (this.isListening) {
+                        this.recognition.stop();
+                    }
+                }
+            }
+
+            updateVoiceToggleUI() {
+                const label = document.getElementById('voiceToggleLabel');
+                const voiceStatus = document.getElementById('voiceStatus');
+                
+                if (this.voiceModeEnabled) {
+                    label.textContent = 'ON';
+                    label.style.color = '#fd79a8';
+                    label.style.fontWeight = 'bold';
+                } else {
+                    label.textContent = 'OFF';
+                    label.style.color = '#666';
+                    label.style.fontWeight = 'normal';
+                    voiceStatus.style.display = 'none';
+                }
+            }
+
+            startAutoListening() {
+                if (!this.recognition || !this.voiceModeEnabled || this.questionAnswered) {
                     return;
                 }
                 
@@ -721,37 +822,38 @@
                     return;
                 }
                 
-                // Request microphone permission and start recognition
+                this.voiceRetryCount++;
                 this.recognition.start();
             }
 
             updateVoiceUI() {
-                const voiceBtn = document.getElementById('voiceBtn');
                 const voiceStatus = document.getElementById('voiceStatus');
                 
+                if (!this.voiceModeEnabled) {
+                    voiceStatus.style.display = 'none';
+                    return;
+                }
+                
                 if (this.isListening) {
-                    voiceBtn.textContent = '🔴 Stop Listening';
-                    voiceBtn.classList.add('listening');
                     voiceStatus.textContent = '🎤 Listening... Say your answer!';
                     voiceStatus.className = 'voice-status listening';
                     voiceStatus.style.display = 'block';
-                } else {
-                    voiceBtn.textContent = '🎤 Say Answer';
-                    voiceBtn.classList.remove('listening');
+                } else if (this.voiceModeEnabled) {
                     voiceStatus.style.display = 'none';
                 }
             }
 
             handleVoiceInput(transcript) {
                 const voiceStatus = document.getElementById('voiceStatus');
-                voiceStatus.textContent = `Heard: "${transcript}"`;
+                voiceStatus.textContent = `👂 Heard: "${transcript}"`;
                 voiceStatus.className = 'voice-status heard';
+                voiceStatus.style.display = 'block';
                 
                 // Try to match the transcript to an answer
                 const possibleAnswers = [this.currentQuestion.answer, ...this.currentQuestion.wrongAnswers];
                 let matchedAnswer = null;
                 
-                // Direct match
+                // Direct match (case insensitive)
                 for (let answer of possibleAnswers) {
                     if (transcript.includes(answer.toString().toLowerCase())) {
                         matchedAnswer = answer;
@@ -765,19 +867,28 @@
                         'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
                         'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
                         'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
-                        'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20
+                        'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+                        'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90,
+                        'hundred': 100
                     };
                     
-                    for (let [word, number] of Object.entries(numberWords)) {
-                        if (transcript.includes(word) && possibleAnswers.includes(number)) {
-                            matchedAnswer = number;
-                            break;
+                    // Handle compound numbers (e.g., "twenty five" -> 25)
+                    let transcriptWords = transcript.split(' ');
+                    let calculatedNumber = 0;
+                    
+                    for (let word of transcriptWords) {
+                        if (numberWords[word] !== undefined) {
+                            calculatedNumber += numberWords[word];
                         }
+                    }
+                    
+                    if (calculatedNumber > 0 && possibleAnswers.includes(calculatedNumber)) {
+                        matchedAnswer = calculatedNumber;
                     }
                     
                     // Also try parsing numbers directly
                     const numbers = transcript.match(/\d+/g);
-                    if (numbers) {
+                    if (numbers && !matchedAnswer) {
                         for (let numStr of numbers) {
                             const num = parseInt(numStr);
                             if (possibleAnswers.includes(num)) {
@@ -789,17 +900,28 @@
                 }
                 
                 if (matchedAnswer !== null) {
+                    voiceStatus.textContent = `✅ Got it: ${matchedAnswer}`;
                     setTimeout(() => {
                         this.selectAnswer(matchedAnswer);
-                    }, 1000);
+                    }, 800);
                 } else {
-                    setTimeout(() => {
-                        voiceStatus.textContent = `Didn't understand. Try again or click an answer.`;
-                        voiceStatus.className = 'voice-status';
+                    voiceStatus.textContent = `🤔 Didn't catch that. Say it again or click!`;
+                    voiceStatus.className = 'voice-status';
+                    
+                    // Auto-retry if voice mode is still enabled
+                    if (this.voiceModeEnabled && this.voiceRetryCount < this.maxVoiceRetries) {
                         setTimeout(() => {
                             voiceStatus.style.display = 'none';
-                        }, 3000);
-                    }, 1000);
+                        }, 2000);
+                    } else {
+                        // Max retries reached
+                        setTimeout(() => {
+                            voiceStatus.textContent = 'Click an answer to continue 👆';
+                            setTimeout(() => {
+                                voiceStatus.style.display = 'none';
+                            }, 3000);
+                        }, 2000);
+                    }
                 }
             }
 
@@ -955,6 +1077,10 @@
                 const cardDisplay = document.getElementById('cardDisplay');
                 cardDisplay.textContent = this.currentQuestion.question;
                 
+                // Reset question state
+                this.questionAnswered = false;
+                this.voiceRetryCount = 0;
+                
                 // Create answer buttons
                 const answers = [this.currentQuestion.answer, ...this.currentQuestion.wrongAnswers];
                 this.shuffle(answers);
@@ -969,9 +1095,22 @@
                     button.onclick = () => this.selectAnswer(answer);
                     container.appendChild(button);
                 });
+                
+                // Auto-start listening if voice mode is enabled
+                if (this.voiceModeEnabled) {
+                    setTimeout(() => {
+                        this.startAutoListening();
+                    }, 500); // Small delay to let the question display
+                }
             }
 
             selectAnswer(selectedAnswer) {
+                // Mark question as answered and stop voice recognition
+                this.questionAnswered = true;
+                if (this.isListening) {
+                    this.recognition.stop();
+                }
+                
                 const isCorrect = selectedAnswer == this.currentQuestion.answer;
                 this.totalQuestions++;
                 
@@ -1170,8 +1309,8 @@
             game.clearProgress();
         }
 
-        function startVoiceInput() {
-            game.startVoiceInput();
+        function toggleVoiceMode() {
+            game.toggleVoiceMode();
         }
 
         // Initialize game
