@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 Super Flash Cards Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            color: #333;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .header {
+            text-align: center;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .title {
+            font-size: 3em;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .age-selector { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .age-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .age-btn:hover { transform: scale(1.05); }
+        .age-btn.active { transform: scale(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .age-3 { background: #ff6b6b; color: white; }
+        .age-6 { background: #4ecdc4; color: white; }
+        .age-8 { background: #45b7d1; color: white; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .stat-value { font-size: 2em; font-weight: bold; color: #ff6b6b; }
+        .stat-label { font-size: 1em; color: #666; }
+        .game-area {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center;
+            min-height: 400px;
+            position: relative;
+        }
+        .card-display {
+            font-size: 4em;
+            margin-bottom: 30px;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .answers {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .answer-btn {
+            padding: 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #ffeaa7, #fab1a0);
+            color: #333;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .answer-btn:hover { transform: translateY(-3px); }
+        .answer-btn.correct { background: linear-gradient(135deg, #00b894, #00cec9); color: white; animation: pulse 0.6s; }
+        .answer-btn.incorrect { background: linear-gradient(135deg, #e17055, #fd79a8); color: white; animation: shake 0.6s; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        .feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            font-weight: bold;
+            opacity: 0;
+            transition: all 0.5s;
+            pointer-events: none;
+        }
+        .feedback.show { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        .celebrating { animation: celebrate 1s ease-in-out; }
+        @keyframes celebrate {
+            0%, 100% { transform: scale(1); }
+            25% { transform: scale(1.02) rotate(1deg); }
+            50% { transform: scale(1.04) rotate(-1deg); }
+            75% { transform: scale(1.02) rotate(0.5deg); }
+        }
+        .mastery-info { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 0.9em; }
+        .topic-mastery { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; }
+        .mastery-bar { background: #ddd; height: 8px; border-radius: 4px; flex-grow: 1; margin: 0 10px; }
+        .mastery-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🌟 Super Flash Cards Game 🌟</h1>
+            <div class="age-selector">
+                <button class="age-btn age-3" onclick="setAge(3)">👶 Age 3</button>
+                <button class="age-btn age-6" onclick="setAge(6)">🧮 Age 6</button>
+                <button class="age-btn age-8 active" onclick="setAge(8)">🚀 Age 8</button>
+            </div>
+        </div>
+        <div class="stats">
+            <div class="stat-card"><div class="stat-value" id="score">0</div><div class="stat-label">Score</div></div>
+            <div class="stat-card"><div class="stat-value" id="streak">0</div><div class="stat-label">Streak</div></div>
+            <div class="stat-card"><div class="stat-value" id="level">1</div><div class="stat-label">Level</div></div>
+            <div class="stat-card"><div class="stat-value" id="accuracy">0%</div><div class="stat-label">Accuracy</div></div>
+        </div>
+        <div class="game-area">
+            <div class="card-display" id="cardDisplay">Welcome! Choose your age to start!</div>
+            <div class="answers" id="answersContainer"></div>
+            <div class="feedback" id="feedback"></div>
+        </div>
+        <div class="mastery-info" id="masteryInfo" style="display: none;">
+            <strong>🎯 Your Progress:</strong>
+            <div id="masteryDetails"></div>
+        </div>
+    </div>
+
+    <script>
+        class SuperFlashCards {
+            constructor() {
+                this.currentAge = 8;
+                this.currentQuestion = null;
+                this.score = 0;
+                this.streak = 0;
+                this.level = 1;
+                this.totalQuestions = 0;
+                this.correctAnswers = 0;
+                this.mastery = {};
+                this.recentPerformance = [];
+                this.initializeContent();
+            }
+
+            initializeContent() {
+                this.content = {
+                    3: {
+                        letters: { questions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'], type: 'letter', difficulty: 1 },
+                        numbers: { questions: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], type: 'number', difficulty: 1 },
+                        colors: { questions: ['🔴', '🟠', '🟡', '🟢', '🔵'], answers: ['Red', 'Orange', 'Yellow', 'Green', 'Blue'], type: 'color', difficulty: 1 },
+                        shapes: { questions: ['⭐', '🔺', '⭕', '🟩'], answers: ['Star', 'Triangle', 'Circle', 'Square'], type: 'shape', difficulty: 1 }
+                    },
+                    6: {
+                        addition: { range: { min: 1, max: 10 }, operation: '+', type: 'math', difficulty: 2 },
+                        subtraction: { range: { min: 1, max: 10 }, operation: '-', type: 'math', difficulty: 2 },
+                        multiplication: { range: { min: 1, max: 5 }, operation: '×', type: 'math', difficulty: 3 }
+                    },
+                    8: {
+                        advancedAddition: { range: { min: 10, max: 50 }, operation: '+', type: 'math', difficulty: 4 },
+                        advancedMultiplication: { range: { min: 6, max: 12 }, operation: '×', type: 'math', difficulty: 5 },
+                        mixedOperations: { range: { min: 1, max: 20 }, operation: 'mixed', type: 'math', difficulty: 6 }
+                    }
+                };
+            }
+
+            setAge(age) {
+                this.currentAge = age;
+                this.mastery = {};
+                document.querySelectorAll('.age-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`.age-${age}`).classList.add('active');
+                this.generateQuestion();
+                this.updateUI();
+            }
+
+            generateQuestion() {
+                const ageContent = this.content[this.currentAge];
+                const topics = Object.keys(ageContent);
+                const selectedTopic = topics[Math.floor(Math.random() * topics.length)];
+                const topicData = ageContent[selectedTopic];
+                this.currentQuestion = this.createQuestion(selectedTopic, topicData);
+                this.displayQuestion();
+            }
+
+            createQuestion(topic, topicData) {
+                if (topicData.type === 'math') {
+                    return this.createMathQuestion(topic, topicData);
+                } else if (topicData.questions) {
+                    return this.createListQuestion(topic, topicData);
+                }
+            }
+
+            createMathQuestion(topic, topicData) {
+                const { min, max } = topicData.range;
+                let num1, num2, operation, answer;
+                
+                if (topicData.operation === 'mixed') {
+                    const operations = ['+', '-', '×'];
+                    operation = operations[Math.floor(Math.random() * operations.length)];
+                } else {
+                    operation = topicData.operation;
+                }
+                
+                switch (operation) {
+                    case '+':
+                        num1 = Math.floor(Math.random() * (max - min + 1)) + min;
+                        num2 = Math.floor(Math.random() * (max - min + 1)) + min;
+                        answer = num1 + num2;
+                        break;
+                    case '-':
+                        num1 = Math.floor(Math.random() * (max - min + 1)) + min;
+                        num2 = Math.floor(Math.random() * Math.min(num1, max)) + 1;
+                        answer = num1 - num2;
+                        break;
+                    case '×':
+                        num1 = Math.floor(Math.random() * (max - min + 1)) + min;
+                        num2 = Math.floor(Math.random() * (max - min + 1)) + min;
+                        answer = num1 * num2;
+                        break;
+                }
+                
+                return {
+                    topic,
+                    question: `${num1} ${operation} ${num2}`,
+                    answer,
+                    wrongAnswers: this.generateWrongAnswers(answer, 3),
+                    type: 'math'
+                };
+            }
+
+            createListQuestion(topic, topicData) {
+                const questionIndex = Math.floor(Math.random() * topicData.questions.length);
+                const question = topicData.questions[questionIndex];
+                const answer = topicData.answers ? topicData.answers[questionIndex] : question.toLowerCase();
+                
+                return {
+                    topic,
+                    question,
+                    answer,
+                    wrongAnswers: this.generateWrongAnswersFromList(topicData.answers || topicData.questions, answer, 3),
+                    type: topicData.type
+                };
+            }
+
+            generateWrongAnswers(correctAnswer, count) {
+                const wrongAnswers = [];
+                const range = Math.max(10, Math.abs(correctAnswer));
+                
+                while (wrongAnswers.length < count) {
+                    const wrong = correctAnswer + Math.floor(Math.random() * range * 2) - range;
+                    if (wrong !== correctAnswer && !wrongAnswers.includes(wrong) && wrong >= 0) {
+                        wrongAnswers.push(wrong);
+                    }
+                }
+                return wrongAnswers;
+            }
+
+            generateWrongAnswersFromList(list, correctAnswer, count) {
+                const wrongAnswers = [];
+                const availableAnswers = list.filter(item => item !== correctAnswer);
+                
+                while (wrongAnswers.length < count && wrongAnswers.length < availableAnswers.length) {
+                    const randomIndex = Math.floor(Math.random() * availableAnswers.length);
+                    const wrong = availableAnswers[randomIndex];
+                    if (!wrongAnswers.includes(wrong)) {
+                        wrongAnswers.push(wrong);
+                    }
+                }
+                return wrongAnswers;
+            }
+
+            displayQuestion() {
+                const cardDisplay = document.getElementById('cardDisplay');
+                cardDisplay.textContent = this.currentQuestion.question;
+                
+                const answers = [this.currentQuestion.answer, ...this.currentQuestion.wrongAnswers];
+                this.shuffle(answers);
+                
+                const container = document.getElementById('answersContainer');
+                container.innerHTML = '';
+                
+                answers.forEach(answer => {
+                    const button = document.createElement('button');
+                    button.className = 'answer-btn';
+                    button.textContent = answer;
+                    button.onclick = () => this.selectAnswer(answer);
+                    container.appendChild(button);
+                });
+            }
+
+            selectAnswer(selectedAnswer) {
+                const isCorrect = selectedAnswer == this.currentQuestion.answer;
+                this.totalQuestions++;
+                
+                const topic = this.currentQuestion.topic;
+                if (!this.mastery[topic]) {
+                    this.mastery[topic] = { correct: 0, total: 0 };
+                }
+                this.mastery[topic].total++;
+                
+                if (isCorrect) {
+                    this.correctAnswers++;
+                    this.mastery[topic].correct++;
+                    this.streak++;
+                    this.score += 10 + (this.streak * 2);
+                    this.showFeedback('🎉 Correct!', 'correct');
+                    
+                    if (this.streak > 0 && this.streak % 5 === 0) {
+                        this.level++;
+                        this.showFeedback('🚀 Level Up!', 'levelup');
+                    }
+                } else {
+                    this.streak = 0;
+                    this.showFeedback(`❌ ${this.currentQuestion.answer}`, 'incorrect');
+                }
+                
+                const buttons = document.querySelectorAll('.answer-btn');
+                buttons.forEach(btn => {
+                    if (btn.textContent == this.currentQuestion.answer) {
+                        btn.classList.add('correct');
+                    } else if (btn.textContent == selectedAnswer && !isCorrect) {
+                        btn.classList.add('incorrect');
+                    }
+                    btn.onclick = null;
+                });
+                
+                this.updateUI();
+                setTimeout(() => this.generateQuestion(), 2000);
+            }
+
+            showFeedback(text, type) {
+                const feedback = document.getElementById('feedback');
+                feedback.textContent = text;
+                feedback.className = `feedback show ${type}`;
+                
+                if (type === 'correct' || type === 'levelup') {
+                    document.querySelector('.game-area').classList.add('celebrating');
+                    setTimeout(() => document.querySelector('.game-area').classList.remove('celebrating'), 1000);
+                }
+                
+                setTimeout(() => feedback.classList.remove('show'), 2000);
+            }
+
+            updateUI() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('streak').textContent = this.streak;
+                document.getElementById('level').textContent = this.level;
+                
+                const accuracy = this.totalQuestions > 0 ? Math.round((this.correctAnswers / this.totalQuestions) * 100) : 0;
+                document.getElementById('accuracy').textContent = accuracy + '%';
+                
+                this.updateMasteryDisplay();
+            }
+
+            updateMasteryDisplay() {
+                const masteryInfo = document.getElementById('masteryInfo');
+                const masteryDetails = document.getElementById('masteryDetails');
+                
+                if (Object.keys(this.mastery).length === 0) {
+                    masteryInfo.style.display = 'none';
+                    return;
+                }
+                
+                masteryInfo.style.display = 'block';
+                masteryDetails.innerHTML = '';
+                
+                Object.entries(this.mastery).forEach(([topic, data]) => {
+                    const accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+                    
+                    const topicDiv = document.createElement('div');
+                    topicDiv.className = 'topic-mastery';
+                    topicDiv.innerHTML = `
+                        <span>${topic}</span>
+                        <div class="mastery-bar">
+                            <div class="mastery-fill" style="width: ${accuracy}%; background: ${
+                                accuracy >= 80 ? '#00b894' : accuracy >= 60 ? '#fdcb6e' : '#e17055'
+                            }"></div>
+                        </div>
+                        <span>${Math.round(accuracy)}%</span>
+                    `;
+                    masteryDetails.appendChild(topicDiv);
+                });
+            }
+
+            shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+        }
+
+        let game;
+        function setAge(age) { game.setAge(age); }
+        window.onload = () => { game = new SuperFlashCards(); };
+    </script>
+</body>
+</html>
