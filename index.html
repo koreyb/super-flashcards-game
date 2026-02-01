@@ -82,6 +82,38 @@
         .age-6 { background: #4ecdc4; color: white; }
         .age-8 { background: #45b7d1; color: white; }
 
+        .save-progress {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .save-input {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            margin: 0 5px;
+            width: 150px;
+        }
+
+        .save-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 3px;
+            font-size: 0.9em;
+        }
+
+        .save-btn:hover { background: #5a6fd8; }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -137,6 +169,44 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             transition: all 0.5s ease;
         }
+
+        .voice-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .voice-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #fd79a8, #fdcb6e);
+            color: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .voice-btn:hover { transform: scale(1.05); }
+        .voice-btn.listening { 
+            background: linear-gradient(135deg, #e17055, #fd79a8);
+            animation: pulse 1s infinite;
+        }
+
+        .voice-status {
+            background: #f8f9fa;
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .voice-status.listening { background: #ffe8e8; color: #e17055; }
+        .voice-status.heard { background: #e8f5e8; color: #00b894; }
 
         .answers {
             display: grid;
@@ -292,6 +362,14 @@
             </div>
         </div>
 
+        <div class="save-progress">
+            <strong>💾 Save Progress:</strong>
+            <input type="text" class="save-input" id="playerName" placeholder="Enter name" maxlength="20">
+            <button class="save-btn" onclick="saveProgress()">Save</button>
+            <button class="save-btn" onclick="loadProgress()">Load</button>
+            <button class="save-btn" onclick="clearProgress()">Clear</button>
+        </div>
+
         <div class="stats">
             <div class="stat-card">
                 <div class="stat-value" id="score">0</div>
@@ -322,6 +400,11 @@
         <div class="game-area">
             <div class="level-indicator" id="levelIndicator">Level 1</div>
             <div class="card-display" id="cardDisplay">Welcome! Choose your age to start!</div>
+            
+            <div class="voice-controls">
+                <button class="voice-btn" id="voiceBtn" onclick="startVoiceInput()">🎤 Say Answer</button>
+            </div>
+            <div class="voice-status" id="voiceStatus" style="display: none;">Ready to listen...</div>
             
             <div class="answers" id="answersContainer">
                 <!-- Answer buttons will be generated here -->
@@ -357,13 +440,19 @@
                 this.isAssessing = true;
                 this.assessmentCount = 0;
                 this.maxAssessment = 10;
+                this.playerName = '';
                 
                 // Track mastery by topic
                 this.mastery = {};
                 this.recentPerformance = [];
                 
+                // Speech recognition
+                this.recognition = null;
+                this.isListening = false;
+                
                 this.initializeContent();
                 this.initializeSounds();
+                this.initializeVoiceRecognition();
             }
 
             initializeContent() {
@@ -471,6 +560,42 @@
                 }
             }
 
+            initializeVoiceRecognition() {
+                // Initialize Web Speech API
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = false;
+                    this.recognition.lang = 'en-US';
+                    
+                    this.recognition.onstart = () => {
+                        this.isListening = true;
+                        this.updateVoiceUI();
+                    };
+                    
+                    this.recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript.toLowerCase().trim();
+                        this.handleVoiceInput(transcript);
+                    };
+                    
+                    this.recognition.onend = () => {
+                        this.isListening = false;
+                        this.updateVoiceUI();
+                    };
+                    
+                    this.recognition.onerror = (event) => {
+                        console.log('Speech recognition error:', event.error);
+                        this.isListening = false;
+                        this.updateVoiceUI();
+                    };
+                } else {
+                    // Hide voice button if not supported
+                    document.querySelector('.voice-controls').style.display = 'none';
+                }
+            }
+
             playSound(type) {
                 if (!this.audioContext) return;
                 
@@ -497,6 +622,185 @@
                 
                 oscillator.start(this.audioContext.currentTime);
                 oscillator.stop(this.audioContext.currentTime + 0.3);
+            }
+
+            saveProgress() {
+                const name = document.getElementById('playerName').value.trim();
+                if (!name) {
+                    alert('Please enter a name to save your progress!');
+                    return;
+                }
+                
+                const progressData = {
+                    playerName: name,
+                    currentAge: this.currentAge,
+                    score: this.score,
+                    streak: this.streak,
+                    level: this.level,
+                    totalQuestions: this.totalQuestions,
+                    correctAnswers: this.correctAnswers,
+                    mastery: this.mastery,
+                    recentPerformance: this.recentPerformance,
+                    savedAt: new Date().toISOString()
+                };
+                
+                localStorage.setItem(`flashcards_${name.toLowerCase()}`, JSON.stringify(progressData));
+                this.playerName = name;
+                alert(`Progress saved for ${name}! 🎉`);
+            }
+
+            loadProgress() {
+                const name = document.getElementById('playerName').value.trim();
+                if (!name) {
+                    alert('Please enter a name to load progress!');
+                    return;
+                }
+                
+                const savedData = localStorage.getItem(`flashcards_${name.toLowerCase()}`);
+                if (!savedData) {
+                    alert(`No saved progress found for ${name}`);
+                    return;
+                }
+                
+                try {
+                    const progressData = JSON.parse(savedData);
+                    
+                    this.playerName = progressData.playerName;
+                    this.currentAge = progressData.currentAge;
+                    this.score = progressData.score || 0;
+                    this.streak = progressData.streak || 0;
+                    this.level = progressData.level || 1;
+                    this.totalQuestions = progressData.totalQuestions || 0;
+                    this.correctAnswers = progressData.correctAnswers || 0;
+                    this.mastery = progressData.mastery || {};
+                    this.recentPerformance = progressData.recentPerformance || [];
+                    
+                    // Update UI
+                    document.querySelectorAll('.age-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelector(`.age-${this.currentAge}`).classList.add('active');
+                    
+                    this.isAssessing = false;
+                    document.getElementById('assessmentMode').style.display = 'none';
+                    
+                    this.generateQuestion();
+                    this.updateUI();
+                    
+                    const savedDate = new Date(progressData.savedAt).toLocaleDateString();
+                    alert(`Welcome back ${name}! Progress loaded from ${savedDate} 🎮`);
+                } catch (error) {
+                    alert('Error loading progress. The saved data might be corrupted.');
+                }
+            }
+
+            clearProgress() {
+                const name = document.getElementById('playerName').value.trim();
+                if (!name) {
+                    alert('Please enter a name to clear progress!');
+                    return;
+                }
+                
+                if (confirm(`Are you sure you want to delete all progress for ${name}?`)) {
+                    localStorage.removeItem(`flashcards_${name.toLowerCase()}`);
+                    alert(`Progress cleared for ${name}`);
+                }
+            }
+
+            startVoiceInput() {
+                if (!this.recognition) {
+                    alert('Voice input not supported in your browser');
+                    return;
+                }
+                
+                if (!this.currentQuestion) {
+                    alert('No question available');
+                    return;
+                }
+                
+                if (this.isListening) {
+                    this.recognition.stop();
+                    return;
+                }
+                
+                // Request microphone permission and start recognition
+                this.recognition.start();
+            }
+
+            updateVoiceUI() {
+                const voiceBtn = document.getElementById('voiceBtn');
+                const voiceStatus = document.getElementById('voiceStatus');
+                
+                if (this.isListening) {
+                    voiceBtn.textContent = '🔴 Stop Listening';
+                    voiceBtn.classList.add('listening');
+                    voiceStatus.textContent = '🎤 Listening... Say your answer!';
+                    voiceStatus.className = 'voice-status listening';
+                    voiceStatus.style.display = 'block';
+                } else {
+                    voiceBtn.textContent = '🎤 Say Answer';
+                    voiceBtn.classList.remove('listening');
+                    voiceStatus.style.display = 'none';
+                }
+            }
+
+            handleVoiceInput(transcript) {
+                const voiceStatus = document.getElementById('voiceStatus');
+                voiceStatus.textContent = `Heard: "${transcript}"`;
+                voiceStatus.className = 'voice-status heard';
+                
+                // Try to match the transcript to an answer
+                const possibleAnswers = [this.currentQuestion.answer, ...this.currentQuestion.wrongAnswers];
+                let matchedAnswer = null;
+                
+                // Direct match
+                for (let answer of possibleAnswers) {
+                    if (transcript.includes(answer.toString().toLowerCase())) {
+                        matchedAnswer = answer;
+                        break;
+                    }
+                }
+                
+                // Number word conversion for math problems
+                if (!matchedAnswer && this.currentQuestion.type === 'math') {
+                    const numberWords = {
+                        'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+                        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+                        'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+                        'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20
+                    };
+                    
+                    for (let [word, number] of Object.entries(numberWords)) {
+                        if (transcript.includes(word) && possibleAnswers.includes(number)) {
+                            matchedAnswer = number;
+                            break;
+                        }
+                    }
+                    
+                    // Also try parsing numbers directly
+                    const numbers = transcript.match(/\d+/g);
+                    if (numbers) {
+                        for (let numStr of numbers) {
+                            const num = parseInt(numStr);
+                            if (possibleAnswers.includes(num)) {
+                                matchedAnswer = num;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (matchedAnswer !== null) {
+                    setTimeout(() => {
+                        this.selectAnswer(matchedAnswer);
+                    }, 1000);
+                } else {
+                    setTimeout(() => {
+                        voiceStatus.textContent = `Didn't understand. Try again or click an answer.`;
+                        voiceStatus.className = 'voice-status';
+                        setTimeout(() => {
+                            voiceStatus.style.display = 'none';
+                        }, 3000);
+                    }, 1000);
+                }
             }
 
             setAge(age) {
@@ -703,6 +1007,10 @@
                     this.recentPerformance.shift();
                 }
                 
+                this.updateAdaptiveLevel();
+                this.updateUI();
+                this.updateFocusArea();
+                
                 // Update answer button styles
                 const buttons = document.querySelectorAll('.answer-btn');
                 buttons.forEach(btn => {
@@ -723,12 +1031,32 @@
                     }
                 }
                 
-                this.updateUI();
-                
                 // Auto-advance to next question
                 setTimeout(() => {
                     this.generateQuestion();
                 }, 2000);
+            }
+
+            updateAdaptiveLevel() {
+                if (this.recentPerformance.length >= 5) {
+                    const recentSuccess = this.recentPerformance.slice(-5).reduce((a, b) => a + b, 0) / 5;
+                    
+                    if (recentSuccess >= 0.8 && this.adaptiveLevel < 3) {
+                        this.adaptiveLevel++;
+                        this.showLevelUp();
+                    } else if (recentSuccess <= 0.4 && this.adaptiveLevel > 1) {
+                        this.adaptiveLevel--;
+                    }
+                }
+            }
+
+            showLevelUp() {
+                const celebration = document.getElementById('celebration');
+                if (celebration) {
+                    celebration.textContent = '🎊 Level Up! 🎊';
+                    celebration.classList.add('show');
+                    setTimeout(() => celebration.classList.remove('show'), 2000);
+                }
             }
 
             showFeedback(text, type) {
@@ -768,6 +1096,23 @@
                 this.updateMasteryDisplay();
             }
 
+            updateFocusArea() {
+                const levelNames = {
+                    1: 'Basic concepts',
+                    2: 'Intermediate skills',
+                    3: 'Advanced challenges'
+                };
+                
+                const strugglingCards = Object.entries(this.mastery)
+                    .filter(([index, stats]) => stats.attempts > 0 && stats.correct / stats.attempts < 0.6)
+                    .length;
+
+                let focusText = `Level ${this.level}`;
+                if (strugglingCards > 0) {
+                    focusText += ` • ${strugglingCards} topics need more practice`;
+                }
+            }
+
             updateMasteryDisplay() {
                 const masteryInfo = document.getElementById('masteryInfo');
                 const masteryDetails = document.getElementById('masteryDetails');
@@ -782,7 +1127,6 @@
                 
                 Object.entries(this.mastery).forEach(([topic, data]) => {
                     const accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
-                    const masteryLevel = accuracy >= 80 ? 'mastered' : accuracy >= 60 ? 'good' : 'needs-work';
                     
                     const topicDiv = document.createElement('div');
                     topicDiv.className = 'topic-mastery';
@@ -812,6 +1156,22 @@
 
         function setAge(age) {
             game.setAge(age);
+        }
+
+        function saveProgress() {
+            game.saveProgress();
+        }
+
+        function loadProgress() {
+            game.loadProgress();
+        }
+
+        function clearProgress() {
+            game.clearProgress();
+        }
+
+        function startVoiceInput() {
+            game.startVoiceInput();
         }
 
         // Initialize game
