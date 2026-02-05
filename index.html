@@ -535,6 +535,11 @@
                             answers: ['Star', 'Triangle', 'Circle', 'Square', 'Heart', 'Diamond'],
                             type: 'shape',
                             difficulty: 1
+                        },
+                        sightWords: {
+                            questions: ['I', 'a', 'and', 'the', 'to', 'you', 'it', 'in', 'is', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use'],
+                            type: 'sightWord',
+                            difficulty: 1
                         }
                     },
                     6: {
@@ -561,6 +566,11 @@
                             operation: '÷',
                             type: 'math',
                             difficulty: 3
+                        },
+                        sightWords: {
+                            questions: ['about', 'after', 'again', 'before', 'came', 'could', 'every', 'first', 'found', 'from', 'give', 'going', 'just', 'know', 'live', 'may', 'most', 'move', 'over', 'right', 'should', 'these', 'think', 'through', 'time', 'very', 'water', 'well', 'were', 'what', 'where', 'which', 'work', 'world', 'would', 'write', 'years', 'your', 'been', 'call'],
+                            type: 'sightWord',
+                            difficulty: 2
                         }
                     },
                     8: {
@@ -592,6 +602,11 @@
                             range: { min: 1, max: 20 },
                             operation: 'mixed',
                             type: 'math',
+                            difficulty: 6
+                        },
+                        sightWords: {
+                            questions: ['although', 'another', 'because', 'between', 'different', 'during', 'example', 'following', 'important', 'including', 'information', 'interest', 'nothing', 'number', 'picture', 'problem', 'question', 'remember', 'several', 'something', 'special', 'together', 'understanding', 'usually', 'without', 'already', 'beautiful', 'country', 'develop', 'exactly', 'finally', 'government', 'however', 'language', 'machine', 'national', 'people', 'possible', 'really', 'system', 'thought', 'through', 'today', 'toward', 'university', 'various', 'welcome', 'wonderful', 'yesterday'],
+                            type: 'sightWord',
                             difficulty: 6
                         }
                     }
@@ -855,7 +870,8 @@
                 
                 // Direct match (case insensitive)
                 for (let answer of possibleAnswers) {
-                    if (transcript.includes(answer.toString().toLowerCase())) {
+                    const answerStr = answer.toString().toLowerCase();
+                    if (transcript === answerStr || transcript.includes(answerStr)) {
                         matchedAnswer = answer;
                         break;
                     }
@@ -1033,7 +1049,13 @@
             createListQuestion(topic, topicData) {
                 const questionIndex = Math.floor(Math.random() * topicData.questions.length);
                 const question = topicData.questions[questionIndex];
-                const answer = topicData.answers ? topicData.answers[questionIndex] : question.toLowerCase();
+                let answer;
+                
+                if (topicData.type === 'sightWord') {
+                    answer = question; // Keep original case for sight words
+                } else {
+                    answer = topicData.answers ? topicData.answers[questionIndex] : question.toLowerCase();
+                }
                 
                 return {
                     topic,
@@ -1075,7 +1097,13 @@
 
             displayQuestion() {
                 const cardDisplay = document.getElementById('cardDisplay');
-                cardDisplay.textContent = this.currentQuestion.question;
+                
+                // Different display formats based on question type
+                if (this.currentQuestion.type === 'sightWord') {
+                    cardDisplay.innerHTML = `<div style="font-size: 2.5em; font-weight: bold; margin-bottom: 10px;">📖 Read this word:</div><div style="font-size: 3em; font-weight: bold; color: #2d3436;">${this.currentQuestion.question}</div>`;
+                } else {
+                    cardDisplay.textContent = this.currentQuestion.question;
+                }
                 
                 // Reset question state
                 this.questionAnswered = false;
